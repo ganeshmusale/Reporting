@@ -464,54 +464,53 @@ const getCurrentVibhagUser = () => {
 const isReportForCurrentVibhag = (report, user) => {
     if (!report || !user) return false;
 
-    const reportVibhagId = String(
-        report?.user_id ??
-        report?.vibhag_user_id ??
-        report?.vibhagUserId ??
-        report?.created_by_id ??
-        report?.vibhag_id ??
-        report?.vibhagId ??
-        ""
-    ).trim();
-
     const currentVibhagId = String(
         user?.userId ??
         user?.vibhagUserId ??
-        user?.id ??
+        localStorage.getItem("logged_in_user_id") ??
         ""
-    ).trim();
+    ).trim().toLowerCase();
 
-    if (reportVibhagId && currentVibhagId) {
-        return reportVibhagId === currentVibhagId;
+    const currentName = normalize(
+        user?.name ??
+        user?.head ??
+        localStorage.getItem("logged_in_name") ??
+        ""
+    );
+
+    const currentMobile = normalize(
+        user?.mobileNumber ||
+        user?.contactNumber ||
+        localStorage.getItem("logged_in_mobile")
+    );
+
+    const reportUserId = String(
+        report?.user_id ??
+        report?.vibhag_user_id ??
+        report?.created_by_id ??
+        ""
+    ).trim().toLowerCase();
+
+    // Owned row → exact login user_id only
+    if (reportUserId) {
+        return Boolean(currentVibhagId) && reportUserId === currentVibhagId;
     }
 
-    // Only if report has no user_id (legacy row)
-    if (!reportVibhagId) {
-        const reportMobile = normalize(report?.mobile_number ?? report?.mobileNumber);
-        const currentMobile = normalize(user?.mobileNumber || user?.contactNumber || localStorage.getItem("logged_in_mobile"));
-        if (reportMobile && currentMobile && reportMobile === currentMobile) {
-            return true;
-        }
+    // Legacy unowned → created_by must match this login (id or name), or mobile
+    const reportCreatedBy = normalize(
+        report?.created_by ??
+        report?.createdBy ??
+        ""
+    );
 
-        const reportName = normalize(
-            report?.name ??
-            report?.created_by ??
-            report?.createdBy ??
-            report?.vibhag_name ??
-            report?.vibhagName ??
-            ""
-        );
+    if (reportCreatedBy) {
+        if (currentVibhagId && reportCreatedBy === currentVibhagId) return true;
+        if (currentName && reportCreatedBy === currentName) return true;
+    }
 
-        const currentName = normalize(
-            user?.name ??
-            user?.head ??
-            user?.vibhag ??
-            ""
-        );
-
-        if (reportName && currentName && reportName === currentName) {
-            return true;
-        }
+    const reportMobile = normalize(report?.mobile_number ?? report?.mobileNumber);
+    if (reportMobile && currentMobile && reportMobile === currentMobile) {
+        return true;
     }
 
     return false;
@@ -2024,6 +2023,11 @@ const VibhagDashboard = () => {
                     userName
                 );
 
+                body.append(
+                    "updated_by",
+                    userName
+                );
+
 
                 body.append(
                     "taluka_id",
@@ -2072,6 +2076,14 @@ const VibhagDashboard = () => {
                         "user_id",
                         loggedInVibhagUserId
                     );
+                    body.append(
+                        "created_by_id",
+                        loggedInVibhagUserId
+                    );
+                    body.append(
+                        "updated_by_id",
+                        loggedInVibhagUserId
+                    );
                 }
 
                 body.append(
@@ -2082,38 +2094,6 @@ const VibhagDashboard = () => {
                         ""
                     ).trim()
                 );
-
-
-                // =================================================
-                // PHOTO 1
-                // =================================================
-
-                if (
-                    formData.meetingPhoto1
-                ) {
-
-                    body.append(
-                        "meeting_photo_1",
-                        formData.meetingPhoto1
-                    );
-
-                }
-
-
-                // =================================================
-                // PHOTO 2
-                // =================================================
-
-                if (
-                    formData.meetingPhoto2
-                ) {
-
-                    body.append(
-                        "meeting_photo_2",
-                        formData.meetingPhoto2
-                    );
-
-                }
 
 
                 // =================================================
@@ -5105,138 +5085,6 @@ const VibhagDashboard = () => {
 
                             </div>
 
-
-                            <hr className="my-4" />
-
-
-                            {/* =================================================
-                                MEETING PHOTOS
-                            ================================================= */}
-
-                            <h5 className="fw-bold border-bottom pb-2 mb-4">
-                                Meeting Photos (बैठकीचे फोटो)
-                            </h5>
-
-
-                            <div className="row g-4">
-
-
-                                {/* PHOTO 1 */}
-
-                                <div className="col-12 col-md-6">
-
-                                    <Form.Group>
-
-                                        <Form.Label className="fw-semibold">
-                                            Meeting Photo 1 (बैठक फोटो १)
-                                        </Form.Label>
-
-                                        <Form.Control
-                                            type="file"
-                                            name="meetingPhoto1"
-                                            accept="image/jpeg,image/jpg,image/png,image/webp"
-                                            onChange={handleChange}
-                                        />
-
-                                        {oldPhoto1 && (
-                                            <div className="mt-3">
-                                                <small className="d-block fw-bold mb-2">
-                                                    Current Photo 1 (सध्याचा फोटो १)
-                                                </small>
-                                                <img
-                                                    src={oldPhoto1}
-                                                    alt="Current Meeting Photo 1"
-                                                    className="img-thumbnail"
-                                                    style={{
-                                                        width: "180px",
-                                                        height: "130px",
-                                                        objectFit: "cover",
-                                                    }}
-                                                />
-                                            </div>
-                                        )}
-
-                                        {formData.meetingPhoto1 && (
-                                            <div className="mt-3">
-                                                <small className="d-block fw-bold text-success mb-2">
-                                                    New Photo 1 (नवीन फोटो १)
-                                                </small>
-                                                <img
-                                                    src={URL.createObjectURL(formData.meetingPhoto1)}
-                                                    alt="New Meeting Photo 1"
-                                                    className="img-thumbnail"
-                                                    style={{
-                                                        width: "180px",
-                                                        height: "130px",
-                                                        objectFit: "cover",
-                                                    }}
-                                                />
-                                            </div>
-                                        )}
-
-                                    </Form.Group>
-
-                                </div>
-
-
-                                {/* PHOTO 2 */}
-
-                                <div className="col-12 col-md-6">
-
-                                    <Form.Group>
-
-                                        <Form.Label className="fw-semibold">
-                                            Meeting Photo 2 (बैठक फोटो २)
-                                        </Form.Label>
-
-                                        <Form.Control
-                                            type="file"
-                                            name="meetingPhoto2"
-                                            accept="image/jpeg,image/jpg,image/png,image/webp"
-                                            onChange={handleChange}
-                                        />
-
-                                        {oldPhoto2 && (
-                                            <div className="mt-3">
-                                                <small className="d-block fw-bold mb-2">
-                                                    Current Photo 2 (सध्याचा फोटो २)
-                                                </small>
-                                                <img
-                                                    src={oldPhoto2}
-                                                    alt="Current Meeting Photo 2"
-                                                    className="img-thumbnail"
-                                                    style={{
-                                                        width: "180px",
-                                                        height: "130px",
-                                                        objectFit: "cover",
-                                                    }}
-                                                />
-                                            </div>
-                                        )}
-
-                                        {formData.meetingPhoto2 && (
-                                            <div className="mt-3">
-                                                <small className="d-block fw-bold text-success mb-2">
-                                                    New Photo 2 (नवीन फोटो २)
-                                                </small>
-                                                <img
-                                                    src={URL.createObjectURL(formData.meetingPhoto2)}
-                                                    alt="New Meeting Photo 2"
-                                                    className="img-thumbnail"
-                                                    style={{
-                                                        width: "180px",
-                                                        height: "130px",
-                                                        objectFit: "cover",
-                                                    }}
-                                                />
-                                            </div>
-                                        )}
-
-                                    </Form.Group>
-
-                                </div>
-
-                            </div>
 
                         </Modal.Body>
 

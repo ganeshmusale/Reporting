@@ -419,10 +419,11 @@ const getReportTrainerId = (report) => {
 
 const getReportTrainerName = (report) => {
     return (
+        report?.created_by ??
+        report?.createdBy ??
         report?.trainer_name ??
         report?.trainerName ??
         report?.trainer ??
-        report?.name ??
         ""
     );
 };
@@ -446,16 +447,7 @@ const getReportDistrict = (report) => {
 };
 
 const isReportForCurrentTrainer = (report, user) => {
-    const currentTrainerId = String(
-        user?.trainerId ??
-        user?.trainerID ??
-        user?.trainer_id ??
-        localStorage.getItem("logged_in_trainer_id") ??
-        ""
-    ).trim();
-
     const currentUserId = String(
-        user?.id ??
         user?.userId ??
         user?.user_id ??
         localStorage.getItem("logged_in_user_id") ??
@@ -472,45 +464,27 @@ const isReportForCurrentTrainer = (report, user) => {
         ""
     );
 
-    const currentTaluka = normalize(
-        user?.taluka ||
-        user?.talukaName ||
-        localStorage.getItem("logged_in_taluka_name") ||
-        ""
-    );
-
-    const currentDistrict = normalize(
-        user?.district ||
-        user?.districtName ||
-        localStorage.getItem("logged_in_district_name") ||
-        ""
-    );
-
     const reportTrainerId = getReportTrainerId(report);
-    const reportTrainerName = normalize(
-        getReportTrainerName(report)
-    );
 
-    // Prefer stable IDs whenever the API provides them.
+    // Owned row → exact login user_id only
     if (reportTrainerId) {
-        return (
-            (!!currentTrainerId &&
-                reportTrainerId === currentTrainerId) ||
-            (!!currentUserId &&
-                reportTrainerId === currentUserId)
-        );
+        return Boolean(currentUserId) && reportTrainerId === currentUserId;
     }
 
-    // Check mobile number for legacy rows
+    // Legacy unowned → mobile or created_by only
     const reportMobile = normalize(report?.mobile_number ?? report?.mobileNumber);
-    const currentMobile = normalize(user?.mobileNumber || user?.contactNumber || localStorage.getItem("logged_in_mobile"));
+    const currentMobile = normalize(
+        user?.mobileNumber ||
+        user?.contactNumber ||
+        localStorage.getItem("logged_in_mobile")
+    );
     if (reportMobile && currentMobile && reportMobile === currentMobile) {
         return true;
     }
 
-    // Existing trainer-reports data stores the trainer in "name".
-    if (currentTrainerName && reportTrainerName) {
-        return reportTrainerName === currentTrainerName;
+    const reportCreatedBy = normalize(getReportTrainerName(report));
+    if (currentTrainerName && reportCreatedBy && reportCreatedBy === currentTrainerName) {
+        return true;
     }
 
     return false;
@@ -1198,32 +1172,22 @@ const TrainerDashboard = () => {
         setOldPhoto2("");
 
 
-        // Preserve previously filled data, only set defaults for missing fields
-        setFormData((prev) => ({
+        // Fresh add form — prefill from logged-in BDO, never keep stale files
+        const loggedMobile =
+            localStorage.getItem("logged_in_mobile") || "";
+
+        setFormData({
             ...EMPTY_FORM,
-            ...prev,
-            name:
-                prev.name ||
-                trainerName,
-
-            designation:
-                prev.designation ||
-                "Trainer",
-
-            taluka:
-                prev.taluka ||
-                talukaName ||
-                "",
-
-            district:
-                prev.district ||
-                districtName ||
-                "",
-
-            reportDate:
-                prev.reportDate ||
-                today,
-        }));
+            name: trainerName || "",
+            designation: "BDO",
+            taluka: talukaName || "",
+            district: districtName || "",
+            mobileNumber: /^\d{10}$/.test(loggedMobile) ? loggedMobile : "",
+            reportDate: today,
+            shopPhoto: null,
+            shopkeeperRegistrationPhoto: null,
+            workPhotoVideo: null,
+        });
 
 
         setModalError("");
@@ -1523,7 +1487,7 @@ const TrainerDashboard = () => {
                 const submitDesignation =
                     formData.designation.trim() ||
                     currentUser?.designation ||
-                    "Trainer";
+                    "BDO";
 
                 const submitTaluka =
                     formData.taluka.trim() ||
@@ -1602,7 +1566,36 @@ const TrainerDashboard = () => {
                         "user_id",
                         loggedInUserId
                     );
+                    data.append(
+                        "created_by_id",
+                        loggedInUserId
+                    );
+                    data.append(
+                        "updated_by_id",
+                        loggedInUserId
+                    );
                 }
+
+                data.append("role", "trainer");
+                data.append("created_by_role", "trainer");
+                data.append(
+                    "created_by",
+                    String(
+                        currentUser?.name ||
+                        localStorage.getItem("logged_in_name") ||
+                        formData.name ||
+                        ""
+                    ).trim()
+                );
+                data.append(
+                    "updated_by",
+                    String(
+                        currentUser?.name ||
+                        localStorage.getItem("logged_in_name") ||
+                        formData.name ||
+                        ""
+                    ).trim()
+                );
 
                 data.append(
                     "mobile_number",
@@ -1625,20 +1618,6 @@ const TrainerDashboard = () => {
                     Number(formData.totalPanelRegistrationAmount) || 0
                 );
                 data.append("payment_mode", formData.paymentMode);
-
-                if (formData.shopPhoto) {
-                    data.append("shop_photo", formData.shopPhoto);
-                }
-                if (formData.shopkeeperRegistrationPhoto) {
-                    data.append(
-                        "shopkeeper_registration_photo",
-                        formData.shopkeeperRegistrationPhoto
-                    );
-                }
-                if (formData.workPhotoVideo) {
-                    data.append("work_photo_video", formData.workPhotoVideo);
-                }
-
 
                 // =====================================
                 // URL
@@ -2988,52 +2967,6 @@ const TrainerDashboard = () => {
                             </Col>
                         </Row>
 
-                        <hr className="my-4" />
-                        <h5 className="fw-bold border-bottom pb-2 mb-3">
-                            Work Proof (कामाचा पुरावा)
-                        </h5>
-                        <Row className="g-4">
-                            <Col xs={12} md={4}>
-                                <Form.Group>
-                                    <Form.Label className="fw-semibold">
-                                        Shop Photo (दुकानाचा फोटो)
-                                    </Form.Label>
-                                    <Form.Control
-                                        type="file"
-                                        name="shopPhoto"
-                                        accept="image/jpeg,image/jpg,image/png,image/webp"
-                                        onChange={handleChange}
-                                    />
-                                </Form.Group>
-                            </Col>
-                            <Col xs={12} md={4}>
-                                <Form.Group>
-                                    <Form.Label className="fw-semibold">
-                                        Photo of the Shopkeeper&apos;s Registration Form (दुकानदाराच्या Registration Form चा फोटो)
-                                    </Form.Label>
-                                    <Form.Control
-                                        type="file"
-                                        name="shopkeeperRegistrationPhoto"
-                                        accept="image/jpeg,image/jpg,image/png,image/webp"
-                                        onChange={handleChange}
-                                    />
-                                </Form.Group>
-                            </Col>
-                            <Col xs={12} md={4}>
-                                <Form.Group>
-                                    <Form.Label className="fw-semibold">
-                                        Today&apos;s Work Photo / Video Proof (आजच्या कामाचे Photo / Video Proof)
-                                    </Form.Label>
-                                    <Form.Control
-                                        type="file"
-                                        name="workPhotoVideo"
-                                        accept="image/*,video/*"
-                                        onChange={handleChange}
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
-
                         {false && (
                         <>
                         {/* =================================================
@@ -3537,9 +3470,11 @@ const TrainerDashboard = () => {
                                     setFormData({
                                         ...EMPTY_FORM,
                                         name: trainerName,
-                                        designation: "Trainer",
+                                        designation: "BDO",
                                         taluka: talukaName || "",
                                         district: districtName || "",
+                                        mobileNumber:
+                                            localStorage.getItem("logged_in_mobile") || "",
                                         reportDate: today,
                                     });
                                     setModalError("");

@@ -116,11 +116,8 @@ const DistrictDashboard = () => {
     "District User";
 
   const getDistrictUserId = () => {
-    return (
-      localStorage.getItem("logged_in_user_id") ||
-      localStorage.getItem("logged_in_district_id") ||
-      ""
-    );
+    // Only the login user_id — never district table PK
+    return localStorage.getItem("logged_in_user_id") || "";
   };
 
   const loadReports = async () => {
@@ -134,17 +131,15 @@ const DistrictDashboard = () => {
       const mobile = localStorage.getItem("logged_in_mobile") || "";
       const userName = localStorage.getItem("logged_in_name") || "";
 
-      let url = API_BASE_URL;
-      if (!isAdmin && userId) {
-        const params = new URLSearchParams();
-        params.set("role", role || "district");
-        params.set("user_id", userId);
+      const params = new URLSearchParams();
+      params.set("role", role || (isAdmin ? "admin" : "district"));
+      if (!isAdmin) {
+        if (userId) params.set("user_id", userId);
         if (mobile) params.set("mobile_number", mobile);
         if (userName) params.set("user_name", userName);
-        url = `${API_BASE_URL}?${params.toString()}`;
       }
 
-      const response = await fetch(url);
+      const response = await fetch(`${API_BASE_URL}?${params.toString()}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -157,15 +152,25 @@ const DistrictDashboard = () => {
       if (isAdmin) {
         setReports(list);
       } else {
+        const myId = String(userId || "").trim().toLowerCase();
+        const myMobile = String(mobile || "").trim();
+        const myName = String(userName || "").trim().toLowerCase();
+
         const myReports = list.filter((r) => {
-          const rUid = String(r?.user_id || "").trim();
-          if (rUid && userId) return rUid.toLowerCase() === userId.toLowerCase();
-          if (!rUid) {
-            const rMobile = String(r?.mobile_number || "").trim();
-            if (mobile && rMobile && rMobile === mobile) return true;
-            const rName = String(r?.name || "").trim().toLowerCase();
-            if (userName && rName && rName === userName.toLowerCase()) return true;
+          const rUid = String(r?.user_id || r?.created_by_id || "").trim().toLowerCase();
+
+          // Owned row → must match logged-in user_id exactly
+          if (rUid) {
+            return Boolean(myId) && rUid === myId;
           }
+
+          // Legacy unowned row → created_by or mobile only (never form name)
+          const rCreatedBy = String(r?.created_by || "").trim().toLowerCase();
+          if (myName && rCreatedBy && rCreatedBy === myName) return true;
+
+          const rMobile = String(r?.mobile_number || r?.mobileNumber || "").trim();
+          if (myMobile && rMobile && rMobile === myMobile) return true;
+
           return false;
         });
         setReports(myReports);
@@ -280,7 +285,28 @@ const DistrictDashboard = () => {
 
       if (userId) {
         formPayload.append("user_id", userId);
+        formPayload.append("created_by_id", userId);
+        formPayload.append("updated_by_id", userId);
       }
+
+      formPayload.append("role", "district");
+      formPayload.append("created_by_role", "district");
+      formPayload.append(
+        "created_by",
+        String(
+          localStorage.getItem("logged_in_name") ||
+          formData.name ||
+          ""
+        ).trim()
+      );
+      formPayload.append(
+        "updated_by",
+        String(
+          localStorage.getItem("logged_in_name") ||
+          formData.name ||
+          ""
+        ).trim()
+      );
 
       formPayload.append("name", formData.name.trim());
       formPayload.append("designation", formData.designation.trim());
@@ -307,14 +333,6 @@ const DistrictDashboard = () => {
       formPayload.append("machine2_total_amount", formData.machine2_total_amount || "0");
       formPayload.append("utr_number", formData.utr_number || "");
       formPayload.append("additional_remarks", formData.additional_remarks || "");
-
-      // Photos
-      if (formData.machine1_camp_photo instanceof File) {
-        formPayload.append("machine1_camp_photo", formData.machine1_camp_photo);
-      }
-      if (formData.machine2_camp_photo instanceof File) {
-        formPayload.append("machine2_camp_photo", formData.machine2_camp_photo);
-      }
 
       const url = editingId
         ? `${API_BASE_URL}/${editingId}`
@@ -1194,45 +1212,6 @@ const DistrictDashboard = () => {
                 </Form.Group>
               </div>
 
-              {/* 19. Machine 1 Camp Photo */}
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label className="fw-semibold">
-                    Machine 1camp photo (मशीन 1 च्या शिबिराचा फोटो)
-                  </Form.Label>
-                  <Form.Control
-                    type="file"
-                    name="machine1_camp_photo"
-                    accept="image/*"
-                    onChange={handleChange}
-                  />
-                  {formData.machine1_camp_photo && (
-                    <small className="text-muted d-block mt-1">
-                      Selected: {formData.machine1_camp_photo instanceof File ? formData.machine1_camp_photo.name : "Existing Machine 1 Photo"}
-                    </small>
-                  )}
-                </Form.Group>
-              </div>
-
-              {/* 20. Machine 2 Camp Photo */}
-              <div className="col-md-6">
-                <Form.Group>
-                  <Form.Label className="fw-semibold">
-                    Machine 2 Camp photo (मशीन 2च्या शिबिराचा फोटो)
-                  </Form.Label>
-                  <Form.Control
-                    type="file"
-                    name="machine2_camp_photo"
-                    accept="image/*"
-                    onChange={handleChange}
-                  />
-                  {formData.machine2_camp_photo && (
-                    <small className="text-muted d-block mt-1">
-                      Selected: {formData.machine2_camp_photo instanceof File ? formData.machine2_camp_photo.name : "Existing Machine 2 Photo"}
-                    </small>
-                  )}
-                </Form.Group>
-              </div>
             </div>
           </Modal.Body>
 

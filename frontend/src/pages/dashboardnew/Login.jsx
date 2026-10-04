@@ -94,8 +94,8 @@ const Login = () => {
 
     localStorage.setItem(
       "logged_in_user_id",
+      // Never fall back to numeric table id — that breaks ownership filters
       user.user_id ||
-        user.id ||
         ""
     );
 
@@ -108,8 +108,7 @@ const Login = () => {
 
     localStorage.setItem(
       "logged_in_role",
-      user.role ||
-        ""
+      String(user.role || "").trim().toLowerCase()
     );
 
     localStorage.setItem(
@@ -310,9 +309,12 @@ const Login = () => {
 
   const redirectByRole = (role) => {
 
-    switch (role) {
+    const normalized = String(role || "").trim().toLowerCase();
+
+    switch (normalized) {
 
       case "admin":
+      case "superadmin":
 
         navigate(
           "/dashboard",
@@ -527,10 +529,27 @@ const Login = () => {
 
         // ===============================================
         // REDIRECT
+        // Hard navigation avoids route-guard race where
+        // localStorage is set but React still sees old auth.
         // ===============================================
 
-        redirectByRole(
-          user.role
+        const normalizedRole = String(user.role || "").trim().toLowerCase();
+        const roleHome = {
+          admin: "/dashboard",
+          superadmin: "/dashboard",
+          district: "/district-dashboard",
+          taluka: "/taluka-dashboard",
+          vibhag: "/vibhag-dashboard",
+          trainer: "/trainer-dashboard",
+        }[normalizedRole];
+
+        if (roleHome) {
+          window.location.assign(roleHome);
+          return;
+        }
+
+        setError(
+          "Invalid user role. Please contact administrator."
         );
 
         return;

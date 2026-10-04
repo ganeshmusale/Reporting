@@ -1,4 +1,9 @@
 const db = require("../config/db");
+const {
+    ensureReportOwnershipColumns,
+    getOwnershipFromBody,
+    fetchReportsForRole,
+} = require("../utils/ensureReportOwnership");
 
 
 // =====================================================
@@ -238,8 +243,11 @@ const createVibhagReport = async (
         // INSERT
         // =================================================
 
-        const submittedUserId = String(req.body.user_id || req.body.created_by_id || "").trim() || null;
-        const submittedRole   = String(req.body.role || req.body.created_by_role || "").trim() || null;
+        const submitted = getOwnershipFromBody(req.body);
+        await ensureReportOwnershipColumns(db);
+        const submittedUserId = submitted.userId;
+        const submittedRole   = submitted.role;
+        const submittedCreatedBy = submitted.createdBy;
 
         const [result] =
             await db.query(
@@ -248,6 +256,7 @@ const createVibhagReport = async (
                 INSERT INTO vibhag_reports
                 (
                     user_id,
+                    created_by,
                     created_by_role,
 
                     name,
@@ -285,7 +294,7 @@ const createVibhagReport = async (
 
                 VALUES
                 (
-                    ?, ?,
+                    ?, ?, ?,
 
                     ?, ?, ?, ?, ?, ?,
 
@@ -313,6 +322,7 @@ const createVibhagReport = async (
 
                 [
                     submittedUserId,
+                    submittedCreatedBy,
                     submittedRole,
 
                     String(name).trim(),
@@ -476,43 +486,11 @@ const getVibhagReports = async (
 ) => {
 
     try {
-        // Role-based filtering:
-        // admin/superadmin → all reports
-        // others → only their own (filtered by user_id or mobile_number)
-        const role      = String(req.query.role          || "").trim().toLowerCase();
-        const userId    = String(req.query.user_id       || "").trim();
-        const mobileNum = String(req.query.mobile_number || "").trim();
-        const userName  = String(req.query.user_name     || req.query.name || "").trim();
-        const isAdmin   = role === "admin" || role === "superadmin" || (!role && !userId && !mobileNum && !userName);
-
-        let rows;
-        if (isAdmin) {
-            [rows] = await db.query(`SELECT * FROM vibhag_reports ORDER BY id DESC`);
-        } else if (userId) {
-            if (mobileNum || userName) {
-                [rows] = await db.query(
-                    `SELECT * FROM vibhag_reports 
-                     WHERE user_id = ? 
-                        OR (user_id IS NULL AND (mobile_number = ? OR name = ?)) 
-                     ORDER BY id DESC`,
-                    [userId, mobileNum || "__none__", userName || "__none__"]
-                );
-            } else {
-                [rows] = await db.query(
-                    `SELECT * FROM vibhag_reports WHERE user_id = ? ORDER BY id DESC`,
-                    [userId]
-                );
-            }
-        } else if (mobileNum || userName) {
-            [rows] = await db.query(
-                `SELECT * FROM vibhag_reports 
-                 WHERE mobile_number = ? OR name = ? 
-                 ORDER BY id DESC`,
-                [mobileNum || "__none__", userName || "__none__"]
-            );
-        } else {
-            [rows] = await db.query(`SELECT * FROM vibhag_reports ORDER BY id DESC`);
-        }
+        const rows = await fetchReportsForRole(
+            db,
+            "vibhag_reports",
+            req.query
+        );
 
         return res.status(200).json({
             success: true,
@@ -818,12 +796,21 @@ const updateVibhagReport = async (
         // UPDATE DATABASE
         // =================================================
 
+        await ensureReportOwnershipColumns(db);
+        const ownership = getOwnershipFromBody(req.body);
+
         await db.query(
 
             `
             UPDATE vibhag_reports
 
             SET
+
+                user_id = COALESCE(user_id, ?),
+                created_by = COALESCE(created_by, ?),
+                created_by_role = COALESCE(created_by_role, ?),
+                updated_by = ?,
+                updated_by_id = ?,
 
                 name = ?,
                 designation = ?,
@@ -861,6 +848,12 @@ const updateVibhagReport = async (
             `,
 
             [
+
+                ownership.userId,
+                ownership.createdBy,
+                ownership.role,
+                ownership.updatedBy,
+                ownership.updatedById,
 
                 finalName,
 

@@ -1,6 +1,11 @@
 const db = require("../config/db");
 const fs = require("fs");
 const path = require("path");
+const {
+    ensureReportOwnershipColumns,
+    getOwnershipFromBody,
+    fetchReportsForRole,
+} = require("../utils/ensureReportOwnership");
 
 // =====================================================
 // DELETE OLD IMAGE
@@ -116,14 +121,18 @@ const createTrainerReport = async (req, res) => {
         // INSERT
         // =================================================
 
-        const submittedUserId = String(req.body.user_id || req.body.created_by_id || "").trim() || null;
-        const submittedRole   = String(req.body.role || req.body.created_by_role || "").trim() || null;
+        const ownership = getOwnershipFromBody(req.body);
+        await ensureReportOwnershipColumns(db);
+        const submittedUserId = ownership.userId;
+        const submittedRole   = ownership.role;
+        const submittedCreatedBy = ownership.createdBy;
 
         const [result] = await db.query(
             `
             INSERT INTO trainer_reports
             (
                 user_id,
+                created_by,
                 created_by_role,
 
                 name,
@@ -144,7 +153,7 @@ const createTrainerReport = async (req, res) => {
             )
             VALUES
             (
-                ?, ?,
+                ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
                 'active'
@@ -152,6 +161,7 @@ const createTrainerReport = async (req, res) => {
             `,
             [
                 submittedUserId,
+                submittedCreatedBy,
                 submittedRole,
 
                 String(name).trim(),
@@ -215,43 +225,11 @@ const createTrainerReport = async (req, res) => {
 
 const getTrainerReports = async (req, res) => {
     try {
-        // Role-based filtering:
-        // admin/superadmin → all reports
-        // others → only their own (filtered by user_id or mobile_number)
-        const role      = String(req.query.role          || "").trim().toLowerCase();
-        const userId    = String(req.query.user_id       || "").trim();
-        const mobileNum = String(req.query.mobile_number || "").trim();
-        const userName  = String(req.query.user_name     || req.query.name || "").trim();
-        const isAdmin   = role === "admin" || role === "superadmin" || (!role && !userId && !mobileNum && !userName);
-
-        let rows;
-        if (isAdmin) {
-            [rows] = await db.query(`SELECT * FROM trainer_reports ORDER BY id DESC`);
-        } else if (userId) {
-            if (mobileNum || userName) {
-                [rows] = await db.query(
-                    `SELECT * FROM trainer_reports 
-                     WHERE user_id = ? 
-                        OR (user_id IS NULL AND (mobile_number = ? OR name = ?)) 
-                     ORDER BY id DESC`,
-                    [userId, mobileNum || "__none__", userName || "__none__"]
-                );
-            } else {
-                [rows] = await db.query(
-                    `SELECT * FROM trainer_reports WHERE user_id = ? ORDER BY id DESC`,
-                    [userId]
-                );
-            }
-        } else if (mobileNum || userName) {
-            [rows] = await db.query(
-                `SELECT * FROM trainer_reports 
-                 WHERE mobile_number = ? OR name = ? 
-                 ORDER BY id DESC`,
-                [mobileNum || "__none__", userName || "__none__"]
-            );
-        } else {
-            [rows] = await db.query(`SELECT * FROM trainer_reports ORDER BY id DESC`);
-        }
+        const rows = await fetchReportsForRole(
+            db,
+            "trainer_reports",
+            req.query
+        );
 
         return res.status(200).json({
             success: true,
@@ -417,7 +395,8 @@ const updateTrainerReport = async (req, res) => {
             ? payment_mode
             : (payment_mode === undefined ? oldReport.payment_mode : null);
 
-        const submittedUserId = String(req.body.user_id || req.body.created_by_id || "").trim() || null;
+        const ownership = getOwnershipFromBody(req.body);
+        await ensureReportOwnershipColumns(db);
 
         // =================================================
         // OLD PHOTOS
@@ -447,6 +426,10 @@ const updateTrainerReport = async (req, res) => {
             UPDATE trainer_reports
             SET
                 user_id = COALESCE(user_id, ?),
+                created_by = COALESCE(created_by, ?),
+                created_by_role = COALESCE(created_by_role, ?),
+                updated_by = ?,
+                updated_by_id = ?,
                 name = ?,
                 designation = ?,
                 taluka = ?,
@@ -466,7 +449,11 @@ const updateTrainerReport = async (req, res) => {
             WHERE id = ?
             `,
             [
-                submittedUserId,
+                ownership.userId,
+                ownership.createdBy,
+                ownership.role,
+                ownership.updatedBy,
+                ownership.updatedById,
                 String(name).trim(),
 
                 String(designation).trim(),

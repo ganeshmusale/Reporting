@@ -154,6 +154,9 @@ const Vibhag = () => {
     const [talukas, setTalukas] =
         useState([]);
 
+    const [allTalukas, setAllTalukas] =
+        useState([]);
+
     const [showModal, setShowModal] =
         useState(false);
 
@@ -488,6 +491,44 @@ const Vibhag = () => {
         };
 
     // =====================================================
+    // FETCH ALL TALUKAS (for master table name lookup)
+    // =====================================================
+
+    const fetchAllTalukas = async () => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/taluka`, {
+                method: "GET",
+                headers: { Accept: "application/json" },
+                cache: "no-store",
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result?.message || "Failed to fetch Talukas");
+            }
+            const rows = getArrayFromResponse(result);
+            setAllTalukas(
+                rows.map((taluka) => ({
+                    ...taluka,
+                    id:
+                        taluka?.id ??
+                        taluka?.taluka_id ??
+                        taluka?.talukaId ??
+                        "",
+                    taluka_name:
+                        taluka?.taluka_name ||
+                        taluka?.talukaName ||
+                        taluka?.taluka ||
+                        taluka?.name ||
+                        "",
+                }))
+            );
+        } catch (error) {
+            console.error("ALL TALUKA FETCH ERROR:", error);
+            setAllTalukas([]);
+        }
+    };
+
+    // =====================================================
     // INITIAL LOAD
     // =====================================================
 
@@ -495,6 +536,7 @@ const Vibhag = () => {
 
         fetchVibhags();
         fetchDistricts();
+        fetchAllTalukas();
 
     }, []);
 
@@ -512,7 +554,8 @@ const Vibhag = () => {
             (d) => safeString(d?.id) === safeString(item?.district_id ?? item?.districtId)
         );
 
-        return district?.district_name || district?.name || "-";
+        // Prefer district_name over head name
+        return district?.district_name || district?.districtName || "-";
     };
 
     // =====================================================
@@ -525,11 +568,12 @@ const Vibhag = () => {
             return String(val).trim();
         }
 
-        const taluka = talukas.find(
-            (t) => safeString(t?.id) === safeString(item?.taluka_id ?? item?.talukaId)
-        );
+        const talukaId = safeString(item?.taluka_id ?? item?.talukaId);
+        const taluka =
+            allTalukas.find((t) => safeString(t?.id) === talukaId) ||
+            talukas.find((t) => safeString(t?.id) === talukaId);
 
-        return taluka?.taluka_name || taluka?.name || taluka?.taluka || "-";
+        return taluka?.taluka_name || taluka?.talukaName || taluka?.taluka || "-";
     };
 
     // =====================================================

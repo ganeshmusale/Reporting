@@ -800,30 +800,26 @@ const TalukaDashboard = () => {
                     report?.userId
                 );
 
-                if (loggedInUserId && reportUserId) {
-                    return reportUserId === loggedInUserId;
+                // Owned row → exact user_id only
+                if (reportUserId) {
+                    return Boolean(loggedInUserId) && reportUserId === loggedInUserId;
                 }
 
-                // If report has no user_id (legacy row), check mobile or name
-                if (!reportUserId) {
-                    const reportMobile = normalize(report?.mobile_number ?? report?.mobileNumber);
-                    if (loggedInMobile && reportMobile && reportMobile === loggedInMobile) {
-                        return true;
-                    }
+                // Legacy unowned → created_by must match login id or name, or mobile
+                const reportCreatedBy = normalize(
+                    report?.created_by ??
+                    report?.createdBy ??
+                    report?.created_by_name ??
+                    report?.createdByName
+                );
+                if (reportCreatedBy) {
+                    if (loggedInUserId && reportCreatedBy === loggedInUserId) return true;
+                    if (loggedInUserName && reportCreatedBy === loggedInUserName) return true;
+                }
 
-                    const reportCreatedBy = normalize(
-                        report?.created_by ??
-                        report?.createdBy ??
-                        report?.created_by_name ??
-                        report?.createdByName ??
-                        report?.user_name ??
-                        report?.userName ??
-                        report?.name
-                    );
-
-                    if (loggedInUserName && reportCreatedBy && reportCreatedBy === loggedInUserName) {
-                        return true;
-                    }
+                const reportMobile = normalize(report?.mobile_number ?? report?.mobileNumber);
+                if (loggedInMobile && reportMobile && reportMobile === loggedInMobile) {
+                    return true;
                 }
 
                 return false;
@@ -1696,6 +1692,11 @@ const TalukaDashboard = () => {
                     userName
                 );
 
+                body.append(
+                    "updated_by",
+                    userName
+                );
+
                 if (currentUser?.userId) {
                     body.append(
                         "user_id",
@@ -1703,6 +1704,10 @@ const TalukaDashboard = () => {
                     );
                     body.append(
                         "created_by_id",
+                        currentUser.userId
+                    );
+                    body.append(
+                        "updated_by_id",
                         currentUser.userId
                     );
                 }
@@ -1720,38 +1725,6 @@ const TalukaDashboard = () => {
                     currentUser?.districtId ||
                     ""
                 );
-
-
-                // =================================================
-                // PHOTO 1
-                // =================================================
-
-                if (
-                    formData.meetingPhoto1
-                ) {
-
-                    body.append(
-                        "meeting_photo_1",
-                        formData.meetingPhoto1
-                    );
-
-                }
-
-
-                // =================================================
-                // PHOTO 2
-                // =================================================
-
-                if (
-                    formData.meetingPhoto2
-                ) {
-
-                    body.append(
-                        "meeting_photo_2",
-                        formData.meetingPhoto2
-                    );
-
-                }
 
 
                 // =================================================
@@ -4756,138 +4729,6 @@ const TalukaDashboard = () => {
 
                             </div>
 
-
-                            <hr className="my-4" />
-
-
-                            {/* =================================================
-                                MEETING PHOTOS
-                            ================================================= */}
-
-                            <h5 className="fw-bold border-bottom pb-2 mb-4">
-                                Meeting Photos (बैठकीचे फोटो)
-                            </h5>
-
-
-                            <div className="row g-4">
-
-
-                                {/* PHOTO 1 */}
-
-                                <div className="col-12 col-md-6">
-
-                                    <Form.Group>
-
-                                        <Form.Label className="fw-semibold">
-                                            Meeting Photo 1 (बैठक फोटो १)
-                                        </Form.Label>
-
-                                        <Form.Control
-                                            type="file"
-                                            name="meetingPhoto1"
-                                            accept="image/jpeg,image/jpg,image/png,image/webp"
-                                            onChange={handleChange}
-                                        />
-
-                                        {oldPhoto1 && (
-                                            <div className="mt-3">
-                                                <small className="d-block fw-bold mb-2">
-                                                    Current Photo 1 (सध्याचा फोटो १)
-                                                </small>
-                                                <img
-                                                    src={oldPhoto1}
-                                                    alt="Current Meeting Photo 1"
-                                                    className="img-thumbnail"
-                                                    style={{
-                                                        width: "180px",
-                                                        height: "130px",
-                                                        objectFit: "cover",
-                                                    }}
-                                                />
-                                            </div>
-                                        )}
-
-                                        {formData.meetingPhoto1 && (
-                                            <div className="mt-3">
-                                                <small className="d-block fw-bold text-success mb-2">
-                                                    New Photo 1 (नवीन फोटो १)
-                                                </small>
-                                                <img
-                                                    src={URL.createObjectURL(formData.meetingPhoto1)}
-                                                    alt="New Meeting Photo 1"
-                                                    className="img-thumbnail"
-                                                    style={{
-                                                        width: "180px",
-                                                        height: "130px",
-                                                        objectFit: "cover",
-                                                    }}
-                                                />
-                                            </div>
-                                        )}
-
-                                    </Form.Group>
-
-                                </div>
-
-
-                                {/* PHOTO 2 */}
-
-                                <div className="col-12 col-md-6">
-
-                                    <Form.Group>
-
-                                        <Form.Label className="fw-semibold">
-                                            Meeting Photo 2 (बैठक फोटो २)
-                                        </Form.Label>
-
-                                        <Form.Control
-                                            type="file"
-                                            name="meetingPhoto2"
-                                            accept="image/jpeg,image/jpg,image/png,image/webp"
-                                            onChange={handleChange}
-                                        />
-
-                                        {oldPhoto2 && (
-                                            <div className="mt-3">
-                                                <small className="d-block fw-bold mb-2">
-                                                    Current Photo 2 (सध्याचा फोटो २)
-                                                </small>
-                                                <img
-                                                    src={oldPhoto2}
-                                                    alt="Current Meeting Photo 2"
-                                                    className="img-thumbnail"
-                                                    style={{
-                                                        width: "180px",
-                                                        height: "130px",
-                                                        objectFit: "cover",
-                                                    }}
-                                                />
-                                            </div>
-                                        )}
-
-                                        {formData.meetingPhoto2 && (
-                                            <div className="mt-3">
-                                                <small className="d-block fw-bold text-success mb-2">
-                                                    New Photo 2 (नवीन फोटो २)
-                                                </small>
-                                                <img
-                                                    src={URL.createObjectURL(formData.meetingPhoto2)}
-                                                    alt="New Meeting Photo 2"
-                                                    className="img-thumbnail"
-                                                    style={{
-                                                        width: "180px",
-                                                        height: "130px",
-                                                        objectFit: "cover",
-                                                    }}
-                                                />
-                                            </div>
-                                        )}
-
-                                    </Form.Group>
-
-                                </div>
-
-                            </div>
 
                         </Modal.Body>
 

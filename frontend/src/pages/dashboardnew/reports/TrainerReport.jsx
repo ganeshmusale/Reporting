@@ -125,7 +125,19 @@ const TrainerReport = () => {
       setLoading(true);
       setError("");
 
-      const res = await fetch(API_BASE_URL);
+      const role = (localStorage.getItem("logged_in_role") || "admin").toLowerCase();
+      const userId = localStorage.getItem("logged_in_user_id") || "";
+      const params = new URLSearchParams();
+      params.set("role", role);
+      if (role !== "admin" && role !== "superadmin" && userId) {
+        params.set("user_id", userId);
+        const mobile = localStorage.getItem("logged_in_mobile") || "";
+        const name = localStorage.getItem("logged_in_name") || "";
+        if (mobile) params.set("mobile_number", mobile);
+        if (name) params.set("user_name", name);
+      }
+
+      const res = await fetch(`${API_BASE_URL}?${params.toString()}`);
       const data = await res.json();
 
       if (!res.ok || data.success === false) {
@@ -258,9 +270,6 @@ const TrainerReport = () => {
         }
       });
 
-      if (editShopPhoto) fd.append("shop_photo", editShopPhoto);
-      if (editRegPhoto) fd.append("shopkeeper_registration_photo", editRegPhoto);
-      if (editWorkProof) fd.append("work_photo_video", editWorkProof);
 
       const res = await fetch(`${API_BASE_URL}/${editingId}`, {
         method: "PUT",
@@ -952,79 +961,6 @@ const TrainerReport = () => {
                 </Form.Group>
               </Col>
 
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label className="fw-semibold">
-                    10 Shop Photo (दुकानाचा फोटो)
-                  </Form.Label>
-                  {previewShopPhoto && (
-                    <div className="mb-2">
-                      <img
-                        src={previewShopPhoto}
-                        alt="Shop Preview"
-                        style={{
-                          maxWidth: "100%",
-                          maxHeight: "120px",
-                          objectFit: "cover",
-                          borderRadius: "6px",
-                        }}
-                      />
-                    </div>
-                  )}
-                  <Form.Control
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileChange(e, "shop_photo")}
-                  />
-                </Form.Group>
-              </Col>
-
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label className="fw-semibold">
-                    11 Photo of Registration Form (दुकानदाराच्या Registration Form चा फोटो)
-                  </Form.Label>
-                  {previewRegPhoto && (
-                    <div className="mb-2">
-                      <img
-                        src={previewRegPhoto}
-                        alt="Registration Form Preview"
-                        style={{
-                          maxWidth: "100%",
-                          maxHeight: "120px",
-                          objectFit: "cover",
-                          borderRadius: "6px",
-                        }}
-                      />
-                    </div>
-                  )}
-                  <Form.Control
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileChange(e, "shopkeeper_registration_photo")}
-                  />
-                </Form.Group>
-              </Col>
-
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label className="fw-semibold">
-                    12 Today’s Work Photo / Video Proof (आजच्या कामाचे Photo / Video Proof)
-                  </Form.Label>
-                  {previewWorkProof && (
-                    <div className="mb-2">
-                      <a href={previewWorkProof} target="_blank" rel="noreferrer" className="btn btn-sm btn-outline-info">
-                        View Current Proof
-                      </a>
-                    </div>
-                  )}
-                  <Form.Control
-                    type="file"
-                    accept="image/*,video/*"
-                    onChange={(e) => handleFileChange(e, "work_photo_video")}
-                  />
-                </Form.Group>
-              </Col>
             </Row>
           </Modal.Body>
           <Modal.Footer>

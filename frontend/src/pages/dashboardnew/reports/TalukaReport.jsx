@@ -126,7 +126,19 @@ const TalukaReport = () => {
       setLoading(true);
       setError("");
 
-      const res = await fetch(API_BASE_URL);
+      const role = (localStorage.getItem("logged_in_role") || "admin").toLowerCase();
+      const userId = localStorage.getItem("logged_in_user_id") || "";
+      const params = new URLSearchParams();
+      params.set("role", role);
+      if (role !== "admin" && role !== "superadmin" && userId) {
+        params.set("user_id", userId);
+        const mobile = localStorage.getItem("logged_in_mobile") || "";
+        const name = localStorage.getItem("logged_in_name") || "";
+        if (mobile) params.set("mobile_number", mobile);
+        if (name) params.set("user_name", name);
+      }
+
+      const res = await fetch(`${API_BASE_URL}?${params.toString()}`);
       const data = await res.json();
 
       if (!res.ok || data.success === false) {
@@ -290,8 +302,6 @@ const TalukaReport = () => {
         }
       });
 
-      if (editPhoto1) fd.append("meeting_photo_1", editPhoto1);
-      if (editPhoto2) fd.append("meeting_photo_2", editPhoto2);
 
       const res = await fetch(`${API_BASE_URL}/${editingId}`, {
         method: "PUT",
@@ -1078,58 +1088,6 @@ const TalukaReport = () => {
                     name="additional_remarks"
                     value={editForm.additional_remarks}
                     onChange={handleEditChange}
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label className="fw-semibold">
-                    Meeting Photo 1(बैठकीचा फोटो १)
-                  </Form.Label>
-                  {previewPhoto1 && (
-                    <div className="mb-2">
-                      <img
-                        src={previewPhoto1}
-                        alt="Photo 1"
-                        style={{
-                          maxWidth: "100%",
-                          maxHeight: "120px",
-                          objectFit: "cover",
-                          borderRadius: "6px",
-                        }}
-                      />
-                    </div>
-                  )}
-                  <Form.Control
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileChange(e, "meeting_photo_1")}
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label className="fw-semibold">
-                    Meeting Photo 2(बैठकीचा फोटो २)
-                  </Form.Label>
-                  {previewPhoto2 && (
-                    <div className="mb-2">
-                      <img
-                        src={previewPhoto2}
-                        alt="Photo 2"
-                        style={{
-                          maxWidth: "100%",
-                          maxHeight: "120px",
-                          objectFit: "cover",
-                          borderRadius: "6px",
-                        }}
-                      />
-                    </div>
-                  )}
-                  <Form.Control
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileChange(e, "meeting_photo_2")}
                   />
                 </Form.Group>
               </Col>

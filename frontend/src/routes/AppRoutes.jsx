@@ -100,14 +100,15 @@ const AdminRoute = ({ children }) => {
       "admin_logged_in"
     );
 
-  const role =
+  const role = String(
     localStorage.getItem(
       "logged_in_role"
-    );
+    ) || ""
+  ).trim().toLowerCase();
 
   if (
     loggedIn !== "true" ||
-    role !== "admin"
+    (role !== "admin" && role !== "superadmin")
   ) {
     return (
       <Navigate
@@ -132,10 +133,11 @@ const DistrictRoute = ({ children }) => {
       "admin_logged_in"
     );
 
-  const role =
+  const role = String(
     localStorage.getItem(
       "logged_in_role"
-    );
+    ) || ""
+  ).trim().toLowerCase();
 
   if (
     loggedIn !== "true" ||
@@ -164,10 +166,11 @@ const TalukaRoute = ({ children }) => {
       "admin_logged_in"
     );
 
-  const role =
+  const role = String(
     localStorage.getItem(
       "logged_in_role"
-    );
+    ) || ""
+  ).trim().toLowerCase();
 
   if (
     loggedIn !== "true" ||
@@ -196,10 +199,11 @@ const VibhagRoute = ({ children }) => {
       "admin_logged_in"
     );
 
-  const role =
+  const role = String(
     localStorage.getItem(
       "logged_in_role"
-    );
+    ) || ""
+  ).trim().toLowerCase();
 
   if (
     loggedIn !== "true" ||
@@ -228,10 +232,11 @@ const TrainerRoute = ({ children }) => {
       "admin_logged_in"
     );
 
-  const role =
+  const role = String(
     localStorage.getItem(
       "logged_in_role"
-    );
+    ) || ""
+  ).trim().toLowerCase();
 
   if (
     loggedIn !== "true" ||

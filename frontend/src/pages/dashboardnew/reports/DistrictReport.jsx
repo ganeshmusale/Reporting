@@ -128,7 +128,19 @@ const DistrictReport = () => {
       setLoading(true);
       setError("");
 
-      const res = await fetch(API_BASE_URL);
+      const role = (localStorage.getItem("logged_in_role") || "admin").toLowerCase();
+      const userId = localStorage.getItem("logged_in_user_id") || "";
+      const params = new URLSearchParams();
+      params.set("role", role);
+      if (role !== "admin" && role !== "superadmin" && userId) {
+        params.set("user_id", userId);
+        const mobile = localStorage.getItem("logged_in_mobile") || "";
+        const name = localStorage.getItem("logged_in_name") || "";
+        if (mobile) params.set("mobile_number", mobile);
+        if (name) params.set("user_name", name);
+      }
+
+      const res = await fetch(`${API_BASE_URL}?${params.toString()}`);
       const data = await res.json();
 
       if (!res.ok || data.success === false) {
@@ -285,8 +297,6 @@ const DistrictReport = () => {
           fd.append(k, editForm[k]);
         }
       });
-      if (editPhoto1) fd.append("machine1_camp_photo", editPhoto1);
-      if (editPhoto2) fd.append("machine2_camp_photo", editPhoto2);
 
       const res = await fetch(`${API_BASE_URL}/${editingId}`, {
         method: "PUT",
@@ -1207,58 +1217,6 @@ const DistrictReport = () => {
                     name="additional_remarks"
                     value={editForm.additional_remarks}
                     onChange={handleEditChange}
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label className="fw-semibold">
-                    Machine 1camp photo (मशीन 1 च्या शिबिराचा फोटो)
-                  </Form.Label>
-                  {previewPhoto1 && (
-                    <div className="mb-2">
-                      <img
-                        src={previewPhoto1}
-                        alt="Photo 1"
-                        style={{
-                          maxWidth: "100%",
-                          maxHeight: "120px",
-                          objectFit: "cover",
-                          borderRadius: "6px",
-                        }}
-                      />
-                    </div>
-                  )}
-                  <Form.Control
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileChange(e, "machine1_camp_photo")}
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group>
-                  <Form.Label className="fw-semibold">
-                    Machine 2 Camp photo (मशीन 2च्या शिबिराचा फोटो)
-                  </Form.Label>
-                  {previewPhoto2 && (
-                    <div className="mb-2">
-                      <img
-                        src={previewPhoto2}
-                        alt="Photo 2"
-                        style={{
-                          maxWidth: "100%",
-                          maxHeight: "120px",
-                          objectFit: "cover",
-                          borderRadius: "6px",
-                        }}
-                      />
-                    </div>
-                  )}
-                  <Form.Control
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileChange(e, "machine2_camp_photo")}
                   />
                 </Form.Group>
               </Col>

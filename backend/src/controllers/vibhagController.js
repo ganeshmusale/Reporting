@@ -16,10 +16,18 @@ const getVibhags = async (req, res) => {
                 v.contact_number,
                 v.designation,
                 v.district_id,
-                COALESCE(NULLIF(d.district_name, ''), d.name, '') AS district_name,
+                COALESCE(
+                    NULLIF(TRIM(v.district_name), ''),
+                    NULLIF(TRIM(d.district_name), ''),
+                    ''
+                ) AS district_name,
                 d.name AS district_head_name,
                 v.taluka_id,
-                COALESCE(NULLIF(t.taluka_name, ''), t.name, '') AS taluka_name,
+                COALESCE(
+                    NULLIF(TRIM(v.taluka_name), ''),
+                    NULLIF(TRIM(t.taluka_name), ''),
+                    ''
+                ) AS taluka_name,
                 t.name AS taluka_head_name,
                 v.vibhag,
                 v.joining_date,
@@ -74,10 +82,18 @@ const getVibhagById = async (req, res) => {
                 v.contact_number,
                 v.designation,
                 v.district_id,
-                COALESCE(NULLIF(d.district_name, ''), d.name, '') AS district_name,
+                COALESCE(
+                    NULLIF(TRIM(v.district_name), ''),
+                    NULLIF(TRIM(d.district_name), ''),
+                    ''
+                ) AS district_name,
                 d.name AS district_head_name,
                 v.taluka_id,
-                COALESCE(NULLIF(t.taluka_name, ''), t.name, '') AS taluka_name,
+                COALESCE(
+                    NULLIF(TRIM(v.taluka_name), ''),
+                    NULLIF(TRIM(t.taluka_name), ''),
+                    ''
+                ) AS taluka_name,
                 t.name AS taluka_head_name,
                 v.vibhag,
                 v.joining_date,
@@ -300,10 +316,18 @@ const createVibhag = async (req, res) => {
                 v.contact_number,
                 v.designation,
                 v.district_id,
-                d.district_name,
+                COALESCE(
+                    NULLIF(TRIM(v.district_name), ''),
+                    NULLIF(TRIM(d.district_name), ''),
+                    ''
+                ) AS district_name,
                 d.name AS district_head_name,
                 v.taluka_id,
-                t.taluka_name,
+                COALESCE(
+                    NULLIF(TRIM(v.taluka_name), ''),
+                    NULLIF(TRIM(t.taluka_name), ''),
+                    ''
+                ) AS taluka_name,
                 t.name AS taluka_head_name,
                 v.vibhag,
                 v.joining_date,
@@ -454,13 +478,24 @@ const updateVibhag = async (req, res) => {
 
         const finalVibhagName = vibhag !== undefined ? String(vibhag).trim() : oldRecord.vibhag;
 
+        const finalDistrictName =
+            district_name !== undefined
+                ? (district_name ? String(district_name).trim() : null)
+                : (oldRecord.district_name || null);
+        const finalTalukaName =
+            taluka_name !== undefined
+                ? (taluka_name ? String(taluka_name).trim() : null)
+                : (oldRecord.taluka_name || null);
+
         await db.query(`
             UPDATE vibhags
             SET
                 vibhag_code = COALESCE(?, vibhag_code),
                 head = ?,
                 district_id = ?,
+                district_name = ?,
                 taluka_id = ?,
+                taluka_name = ?,
                 contact_number = COALESCE(?, contact_number),
                 designation = COALESCE(?, designation),
                 joining_date = COALESCE(?, joining_date),
@@ -478,7 +513,9 @@ const updateVibhag = async (req, res) => {
             vibhag_code ? String(vibhag_code).trim() : null,
             finalHead,
             finalDistrictId,
+            finalDistrictName,
             finalTalukaId,
+            finalTalukaName,
             contact_number ? String(contact_number).trim() : null,
             designation ? String(designation).trim() : null,
             joining_date || null,
@@ -512,10 +549,18 @@ const updateVibhag = async (req, res) => {
                 v.contact_number,
                 v.designation,
                 v.district_id,
-                d.district_name,
+                COALESCE(
+                    NULLIF(TRIM(v.district_name), ''),
+                    NULLIF(TRIM(d.district_name), ''),
+                    ''
+                ) AS district_name,
                 d.name AS district_head_name,
                 v.taluka_id,
-                t.taluka_name,
+                COALESCE(
+                    NULLIF(TRIM(v.taluka_name), ''),
+                    NULLIF(TRIM(t.taluka_name), ''),
+                    ''
+                ) AS taluka_name,
                 t.name AS taluka_head_name,
                 v.vibhag,
                 v.joining_date,

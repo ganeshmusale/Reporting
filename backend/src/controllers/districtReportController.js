@@ -1,4 +1,9 @@
 const db = require("../config/db");
+const {
+    ensureReportOwnershipColumns,
+    getOwnershipFromBody,
+    fetchReportsForRole,
+} = require("../utils/ensureReportOwnership");
 
 /*
 =====================================================
@@ -114,11 +119,16 @@ const createDistrictReport = async (req, res) => {
         const activeCount = Number(total_active_center_heads) || 0;
         const otherInfo = additional_remarks || null;
 
+        await ensureReportOwnershipColumns(db);
+        const ownership = getOwnershipFromBody(req.body);
+
         const [result] = await db.query(
             `
             INSERT INTO district_reports
             (
                 user_id,
+                created_by,
+                created_by_role,
                 name,
                 designation,
                 taluka,
@@ -147,7 +157,7 @@ const createDistrictReport = async (req, res) => {
             )
             VALUES
             (
-                ?, ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?,
                 ?, ?, ?, ?, ?, ?, ?, ?,
                 ?, ?,
@@ -157,6 +167,8 @@ const createDistrictReport = async (req, res) => {
             `,
             [
                 currentUserId,
+                ownership.createdBy || (name ? String(name).trim() : null),
+                ownership.role || "district",
                 name,
                 designation || null,
                 taluka || null,
@@ -207,42 +219,16 @@ const createDistrictReport = async (req, res) => {
 
 const getDistrictReports = async (req, res) => {
     try {
-        const role = String(req.query.role || req.user?.role || "").trim().toLowerCase();
-        const isAdmin = role === "admin" || role === "superadmin";
-        const currentUserId = getCurrentUserId(req);
-        const mobileNum = String(req.query.mobile_number || "").trim();
-        const userName = String(req.query.user_name || req.query.name || "").trim();
-        let reports;
-
-        if (!isAdmin && (currentUserId || mobileNum || userName)) {
-            if (currentUserId) {
-                if (mobileNum || userName) {
-                    [reports] = await db.query(
-                        `SELECT * FROM district_reports 
-                         WHERE user_id = ? 
-                            OR (user_id IS NULL AND (mobile_number = ? OR name = ?)) 
-                         ORDER BY id DESC`,
-                        [currentUserId, mobileNum || "__none__", userName || "__none__"]
-                    );
-                } else {
-                    [reports] = await db.query(
-                        `SELECT * FROM district_reports WHERE user_id = ? ORDER BY id DESC`,
-                        [currentUserId]
-                    );
-                }
-            } else {
-                [reports] = await db.query(
-                    `SELECT * FROM district_reports 
-                     WHERE mobile_number = ? OR name = ? 
-                     ORDER BY id DESC`,
-                    [mobileNum || "__none__", userName || "__none__"]
-                );
+        const reports = await fetchReportsForRole(
+            db,
+            "district_reports",
+            {
+                role: req.query.role || req.user?.role || "",
+                user_id: getCurrentUserId(req) || req.query.user_id || "",
+                mobile_number: req.query.mobile_number || "",
+                user_name: req.query.user_name || req.query.name || "",
             }
-        } else {
-            [reports] = await db.query(
-                `SELECT * FROM district_reports ORDER BY id DESC`
-            );
-        }
+        );
 
         return res.status(200).json({
             success: true,
@@ -385,9 +371,17 @@ const updateDistrictReport = async (req, res) => {
 
         const otherInfo = additional_remarks ?? old.additional_remarks ?? null;
 
+        await ensureReportOwnershipColumns(db);
+        const ownership = getOwnershipFromBody(req.body);
+
         let updateQuery = `
             UPDATE district_reports
             SET
+                user_id = COALESCE(user_id, ?),
+                created_by = COALESCE(created_by, ?),
+                created_by_role = COALESCE(created_by_role, ?),
+                updated_by = ?,
+                updated_by_id = ?,
                 name = ?,
                 designation = ?,
                 taluka = ?,
@@ -417,6 +411,11 @@ const updateDistrictReport = async (req, res) => {
         `;
 
         const updateValues = [
+            currentUserId || ownership.userId,
+            ownership.createdBy,
+            ownership.role || "district",
+            ownership.updatedBy,
+            ownership.updatedById || currentUserId,
             name ?? old.name,
             designation ?? old.designation,
             taluka ?? old.taluka,

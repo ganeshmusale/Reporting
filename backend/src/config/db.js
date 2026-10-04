@@ -27,6 +27,20 @@ const testDatabaseConnection = async () => {
     try {
         const [rows] = await pool.query("SELECT 1 AS database_test");
         console.log("Database Test:", rows[0]);
+
+        // Ensure ownership columns exist for role-based report filtering
+        try {
+            const {
+                ensureReportOwnershipColumns,
+            } = require("../utils/ensureReportOwnership");
+            await ensureReportOwnershipColumns(pool);
+        } catch (schemaErr) {
+            console.error(
+                "Ownership schema ensure warning:",
+                schemaErr.message || schemaErr
+            );
+        }
+
         return true;
     } catch (error) {
         console.error("Database test failed:", error.message);

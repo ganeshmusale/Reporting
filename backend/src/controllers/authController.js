@@ -122,35 +122,158 @@ const login = async (req, res) => {
 
 
             // ---------------------------------------------
-            // SUCCESS
+            // SUCCESS — enrich profile from role master
+            // so dashboards always get mobile / area IDs
             // ---------------------------------------------
 
-            return res.status(200).json({
+            const role = String(user.role || "").trim().toLowerCase();
+            const profile = {
+                id: user.id,
+                user_id: user.user_id,
+                name: user.name,
+                role: user.role,
+                status: user.status,
+            };
 
-                success: true,
-
-                message:
-                    "Login successful",
-
-                user: {
-
-                    id:
-                        user.id,
-
-                    user_id:
-                        user.user_id,
-
-                    name:
-                        user.name,
-
-                    role:
-                        user.role,
-
-                    status:
-                        user.status
-
+            try {
+                if (role === "district") {
+                    const [rows] = await db.query(
+                        `
+                        SELECT id, name, user_id, contact_number, district_name, status
+                        FROM districts
+                        WHERE user_id = ?
+                        LIMIT 1
+                        `,
+                        [user.user_id]
+                    );
+                    if (rows.length > 0) {
+                        const d = rows[0];
+                        profile.name = d.name || profile.name;
+                        profile.contact_number = d.contact_number || null;
+                        profile.district_id = d.id;
+                        profile.district_name =
+                            d.district_name || d.name || null;
+                        profile.status = d.status || profile.status;
+                    }
+                } else if (role === "taluka") {
+                    const [rows] = await db.query(
+                        `
+                        SELECT
+                            t.id,
+                            t.name,
+                            t.user_id,
+                            t.contact_number,
+                            t.district_id,
+                            t.taluka_name,
+                            t.status,
+                            d.district_name
+                        FROM talukas t
+                        LEFT JOIN districts d ON d.id = t.district_id
+                        WHERE t.user_id = ?
+                        LIMIT 1
+                        `,
+                        [user.user_id]
+                    );
+                    if (rows.length > 0) {
+                        const t = rows[0];
+                        profile.name = t.name || profile.name;
+                        profile.contact_number = t.contact_number || null;
+                        profile.taluka_id = t.id;
+                        profile.taluka_name =
+                            t.taluka_name || t.name || null;
+                        profile.district_id = t.district_id || null;
+                        profile.district_name = t.district_name || null;
+                        profile.status = t.status || profile.status;
+                    }
+                } else if (role === "vibhag") {
+                    const [rows] = await db.query(
+                        `
+                        SELECT
+                            v.id,
+                            v.head,
+                            v.name,
+                            v.user_id,
+                            v.contact_number,
+                            v.district_id,
+                            v.taluka_id,
+                            v.vibhag,
+                            v.status,
+                            COALESCE(
+                                NULLIF(TRIM(v.district_name), ''),
+                                NULLIF(TRIM(d.district_name), ''),
+                                ''
+                            ) AS district_name,
+                            COALESCE(
+                                NULLIF(TRIM(v.taluka_name), ''),
+                                NULLIF(TRIM(t.taluka_name), ''),
+                                ''
+                            ) AS taluka_name
+                        FROM vibhags v
+                        LEFT JOIN districts d ON d.id = v.district_id
+                        LEFT JOIN talukas t ON t.id = v.taluka_id
+                        WHERE v.user_id = ?
+                        LIMIT 1
+                        `,
+                        [user.user_id]
+                    );
+                    if (rows.length > 0) {
+                        const v = rows[0];
+                        profile.name =
+                            v.head || v.name || profile.name;
+                        profile.contact_number = v.contact_number || null;
+                        profile.vibhag_id = v.id;
+                        profile.vibhag_name =
+                            v.vibhag || v.head || v.name || null;
+                        profile.taluka_id = v.taluka_id || null;
+                        profile.taluka_name = v.taluka_name || null;
+                        profile.district_id = v.district_id || null;
+                        profile.district_name = v.district_name || null;
+                        profile.status = v.status || profile.status;
+                    }
+                } else if (role === "trainer") {
+                    const [rows] = await db.query(
+                        `
+                        SELECT
+                            tr.id,
+                            tr.name,
+                            tr.user_id,
+                            tr.contact_number,
+                            tr.district_id,
+                            tr.taluka_id,
+                            tr.status,
+                            COALESCE(NULLIF(TRIM(d.district_name), ''), '') AS district_name,
+                            COALESCE(NULLIF(TRIM(t.taluka_name), ''), '') AS taluka_name
+                        FROM trainers tr
+                        LEFT JOIN districts d ON d.id = tr.district_id
+                        LEFT JOIN talukas t ON t.id = tr.taluka_id
+                        WHERE tr.user_id = ?
+                        LIMIT 1
+                        `,
+                        [user.user_id]
+                    );
+                    if (rows.length > 0) {
+                        const t = rows[0];
+                        profile.name = t.name || profile.name;
+                        profile.contact_number = t.contact_number || null;
+                        profile.trainer_id = t.id;
+                        profile.district_id = t.district_id || null;
+                        profile.district_name = t.district_name || null;
+                        profile.taluka_id = t.taluka_id || null;
+                        profile.taluka_name = t.taluka_name || null;
+                        profile.status = t.status || profile.status;
+                    }
                 }
+            } catch (enrichErr) {
+                console.error(
+                    "LOGIN PROFILE ENRICH WARNING:",
+                    enrichErr.message || enrichErr
+                );
+            }
 
+            return res.status(200).json({
+                success: true,
+                message: "Login successful",
+                user: profile,
             });
 
         }
@@ -171,6 +294,7 @@ const login = async (req, res) => {
                     password,
                     email,
                     contact_number,
+                    district_name,
                     status
                 FROM districts
                 WHERE user_id = ?
@@ -330,6 +454,7 @@ const login = async (req, res) => {
                         district.id,
 
                     district_name:
+                        district.district_name ||
                         district.name,
 
                     email:
@@ -888,6 +1013,31 @@ const login = async (req, res) => {
             // SUCCESS
             // ---------------------------------------------
 
+            // Resolve district/taluka names for BDO dashboard prefill
+            let trainerDistrictName = null;
+            let trainerTalukaName = null;
+            try {
+                if (trainer.district_id) {
+                    const [dRows] = await db.query(
+                        `SELECT district_name FROM districts WHERE id = ? LIMIT 1`,
+                        [trainer.district_id]
+                    );
+                    trainerDistrictName = dRows[0]?.district_name || null;
+                }
+                if (trainer.taluka_id) {
+                    const [tRows] = await db.query(
+                        `SELECT taluka_name FROM talukas WHERE id = ? LIMIT 1`,
+                        [trainer.taluka_id]
+                    );
+                    trainerTalukaName = tRows[0]?.taluka_name || null;
+                }
+            } catch (nameErr) {
+                console.error(
+                    "TRAINER LOGIN NAME LOOKUP WARNING:",
+                    nameErr.message || nameErr
+                );
+            }
+
             return res.status(200).json({
 
                 success: true,
@@ -919,9 +1069,15 @@ const login = async (req, res) => {
                         trainer.district_id ||
                         null,
 
+                    district_name:
+                        trainerDistrictName,
+
                     taluka_id:
                         trainer.taluka_id ||
                         null,
+
+                    taluka_name:
+                        trainerTalukaName,
 
                     email:
                         trainer.email ||
